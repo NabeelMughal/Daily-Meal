@@ -68,6 +68,20 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
   const [categoryLoading, setCategoryLoading] = useState(false)
   const [imageLoading, setImageLoading] = useState(false)
 
+  // Warn on unsaved changes before leaving
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      const isDirty = title.trim() || description.trim() || ingredients.some(i => i.name.trim()) || instructions.some(step => step.trim())
+      if (isDirty && !busy) {
+        e.preventDefault()
+        e.returnValue = 'You have unsaved recipe changes. Are you sure you want to leave?'
+        return e.returnValue
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [title, description, ingredients, instructions, busy])
+
   // Fetch user categories
   useEffect(() => {
     async function load() {
