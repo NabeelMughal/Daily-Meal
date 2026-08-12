@@ -7,6 +7,49 @@ import { Plus, Trash2, Image as ImageIcon, Loader2, X, ArrowLeft } from 'lucide-
 import { listCachedCategories } from '@/lib/offline-db'
 import { FullScreenLoading } from './full-screen-loading'
 
+// Client-side image compression to downscale and reduce file size
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+
+        const MAX_DIM = 1200
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width)
+            width = MAX_DIM
+          } else {
+            width = Math.round((width * MAX_DIM) / height)
+            height = MAX_DIM
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(reader.result as string)
+          return
+        }
+
+        ctx.drawImage(img, 0, 0, width, height)
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75)
+        resolve(compressedBase64)
+      }
+      img.onerror = () => reject(new Error('Failed to load image for compression.'))
+      img.src = event.target?.result as string
+    }
+    reader.onerror = () => reject(new Error('Failed to read image file.'))
+    reader.readAsDataURL(file)
+  })
+}
+
 type Ingredient = { name: string; quantity: string; unit: string; notes: string }
 
 type Recipe = { 
@@ -67,6 +110,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categoryLoading, setCategoryLoading] = useState(false)
   const [imageLoading, setImageLoading] = useState(false)
+  const [imageError, setImageError] = useState('')
 
   // Warn on unsaved changes before leaving
   useEffect(() => {
@@ -147,33 +191,22 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
     }
   }
 
-  // Handle multiple image uploads (FileReader conversion to Base64)
+  // Handle multiple image uploads (with auto-compression using canvas)
   async function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (!files.length) return
     
     setImageLoading(true)
-    setMessage('')
+    setImageError('')
 
     try {
-      const base64Strings = await Promise.all(
-        files.map((file) => {
-          return new Promise<string>((resolve, reject) => {
-            if (file.size > 1.5 * 1024 * 1024) {
-              reject(new Error(`${file.name} is too large. Max size is 1.5MB.`))
-              return
-            }
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result as string)
-            reader.onerror = () => reject(new Error(`Failed to read ${file.name}`))
-            reader.readAsDataURL(file)
-          })
-        })
+      const compressedStrings = await Promise.all(
+        files.map((file) => compressImage(file))
       )
 
-      setImageUrls((prev) => [...prev, ...base64Strings])
+      setImageUrls((prev) => [...prev, ...compressedStrings])
     } catch (err: any) {
-      setMessage(err.message ?? 'Failed to read one or more images.')
+      setImageError(err.message ?? 'Failed to process one or more images.')
     } finally {
       setImageLoading(false)
     }
@@ -185,6 +218,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
     if (!inputUrl.trim()) return
     setImageUrls((prev) => [...prev, inputUrl.trim()])
     setInputUrl('')
+    setImageError('')
   }
 
   // Submit recipe (Create or Update)
@@ -367,6 +401,11 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
         {/* Image handling */}
         <div className="md:col-span-2">
           <span className="field-label">Recipe Images (Upload Multiple)</span>
+          {imageError && (
+            <div className="mt-1.5 text-xs text-destructive font-medium border border-destructive/20 bg-destructive/5 px-3 py-2 rounded-xl animate-in slide-in-from-top-1 duration-200">
+              {imageError}
+            </div>
+          )}
           <div className="mt-2 flex flex-col gap-4">
             
             {/* Grid of uploaded images */}
@@ -403,7 +442,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
                 <label htmlFor="image-upload" className="flex flex-col items-center gap-2 cursor-pointer w-full h-full text-center">
                   <ImageIcon size={36} className="text-muted-foreground group-hover:text-primary transition-colors" />
                   <span className="text-sm font-medium">Click to upload recipe images (multiple allowed)</span>
-                  <span className="text-xs text-muted-foreground">Supports PNG, JPG, WEBP (Max 1.5MB per image)</span>
+                  <span className="text-xs text-muted-foreground">Supports PNG, JPG, WEBP (Auto-compressed to load instantly)</span>
                   <input 
                     type="file" 
                     id="image-upload" 
