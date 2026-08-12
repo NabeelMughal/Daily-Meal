@@ -199,12 +199,12 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
           {/* Mobile Search Toggle Button */}
           <button 
             onClick={() => setIsSearchVisible(!isSearchVisible)}
-            className={`p-2 rounded-full md:hidden hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200 ${
-              isSearchVisible ? 'bg-primary/10 text-primary' : ''
+            className={`p-2.5 rounded-xl md:hidden bg-primary/5 hover:bg-primary/10 border border-primary/10 text-primary transition-all duration-200 ${
+              isSearchVisible ? 'bg-primary/15' : ''
             }`}
             aria-label="Toggle search panel"
           >
-            <Search size={20} />
+            <Search size={20} className="stroke-[2.2]" />
           </button>
 
           <div className="hidden md:flex items-center gap-2">
@@ -332,9 +332,14 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
       {/* Discovery / Recipes Listing */}
       <section id="discover" className="mx-auto max-w-7xl px-5 pb-24 sm:px-10 border-t border-border/20 pt-4 md:pt-8 animate-in fade-in duration-500 delay-150">
         
-        {/* Mobile Tagline (Small elegant brown text) */}
-        <div className="md:hidden text-center text-primary text-xs font-semibold uppercase tracking-wider font-mono py-4 mt-2">
-          Good food, remembered.
+        {/* Mobile App Title Header */}
+        <div className="md:hidden pt-5 pb-2 text-left px-1">
+          <h1 className="font-serif text-3xl font-medium tracking-tight text-foreground leading-none">
+            My Cookbook
+          </h1>
+          <p className="text-[10px] font-mono uppercase tracking-[0.24em] text-primary mt-2">
+            Good food, remembered.
+          </p>
         </div>
 
         {/* Categories Bar */}
@@ -401,6 +406,21 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
               const cardImage = recipe.image_url ?? recipe.imageUrl
               const recipeCategory = categories.find(c => c.id === (recipe.category_id ?? recipe.categoryId))
 
+              // Safe extraction of display cover image from single-URL or multiple-images JSON array
+              let displayImageUrl = ''
+              if (cardImage) {
+                if (cardImage.startsWith('[')) {
+                  try {
+                    const parsed = JSON.parse(cardImage)
+                    if (parsed && parsed.length > 0) displayImageUrl = parsed[0]
+                  } catch (e) {
+                    displayImageUrl = cardImage
+                  }
+                } else {
+                  displayImageUrl = cardImage
+                }
+              }
+
               // Color-coded difficulty badges matching crumb branding
               const diffColors = {
                 easy: 'bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-400 border border-green-200/30',
@@ -416,10 +436,10 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
                 >
                   <div>
                     {/* Optional Image rendering */}
-                    {cardImage ? (
+                    {displayImageUrl ? (
                       <div className="w-full h-44 overflow-hidden rounded-2xl mb-4 bg-muted border border-border/30 relative shadow-inner">
                         <img 
-                          src={cardImage} 
+                          src={displayImageUrl} 
                           alt={recipe.title} 
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                         />

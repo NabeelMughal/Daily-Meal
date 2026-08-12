@@ -32,7 +32,21 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
   const [servings, setServings] = useState(String(recipe?.servings ?? '2'))
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>(recipe?.difficulty ?? 'easy')
   const [categoryId, setCategoryId] = useState<string>(recipe?.category_id ?? '')
-  const [imageUrl, setImageUrl] = useState<string>(recipe?.image_url ?? '')
+  
+  // Multiple images state (backward-compatible)
+  const [imageUrls, setImageUrls] = useState<string[]>(() => {
+    if (!recipe?.image_url) return []
+    if (recipe.image_url.startsWith('[')) {
+      try {
+        return JSON.parse(recipe.image_url)
+      } catch (e) {
+        return [recipe.image_url]
+      }
+    }
+    return [recipe.image_url]
+  })
+  
+  const [inputUrl, setInputUrl] = useState('')
   
   // Ingredients state setup (initialize with default structure)
   const initialIngredients = recipe?.ingredients && recipe.ingredients.length > 0 
@@ -53,9 +67,6 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categoryLoading, setCategoryLoading] = useState(false)
   const [imageLoading, setImageLoading] = useState(false)
-  
-  // ... rest of content
-
 
   // Fetch user categories
   useEffect(() => {
@@ -122,29 +133,44 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
     }
   }
 
-  // Handle image upload with FileReader conversion to Base64
-  async function handleImageFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // Handle multiple image uploads (FileReader conversion to Base64)
+  async function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
     
-    // Check file size (e.g. limit to 1.5MB to ensure it saves nicely in database)
-    if (file.size > 1.5 * 1024 * 1024) {
-      setMessage('Image is too large. Please select an image under 1.5MB.')
-      return
-    }
-
     setImageLoading(true)
     setMessage('')
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setImageUrl(reader.result as string)
+
+    try {
+      const base64Strings = await Promise.all(
+        files.map((file) => {
+          return new Promise<string>((resolve, reject) => {
+            if (file.size > 1.5 * 1024 * 1024) {
+              reject(new Error(`${file.name} is too large. Max size is 1.5MB.`))
+              return
+            }
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.onerror = () => reject(new Error(`Failed to read ${file.name}`))
+            reader.readAsDataURL(file)
+          })
+        })
+      )
+
+      setImageUrls((prev) => [...prev, ...base64Strings])
+    } catch (err: any) {
+      setMessage(err.message ?? 'Failed to read one or more images.')
+    } finally {
       setImageLoading(false)
     }
-    reader.onerror = () => {
-      setMessage('Failed to read image file.')
-      setImageLoading(false)
-    }
-    reader.readAsDataURL(file)
+  }
+
+  // Add pasted URL
+  function addPastedUrl(e: React.MouseEvent) {
+    e.preventDefault()
+    if (!inputUrl.trim()) return
+    setImageUrls((prev) => [...prev, inputUrl.trim()])
+    setInputUrl('')
   }
 
   // Submit recipe (Create or Update)
@@ -169,7 +195,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
       servings: Math.max(1, Number(servings) || 1),
       difficulty,
       category_id: categoryId || null,
-      image_url: imageUrl || null
+      image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null
     }
 
     try {
@@ -326,63 +352,73 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
 
         {/* Image handling */}
         <div className="md:col-span-2">
-          <span className="field-label">Recipe Image</span>
+          <span className="field-label">Recipe Images (Upload Multiple)</span>
           <div className="mt-2 flex flex-col gap-4">
             
-            {/* Image Preview & Controls */}
-            {imageUrl ? (
-              <div className="relative group overflow-hidden rounded-2xl border border-border bg-muted flex items-center justify-center max-h-72 aspect-video transition-all animate-in fade-in duration-300">
-                <img 
-                  src={imageUrl} 
-                  alt="Recipe preview" 
-                  className="w-full h-full object-cover rounded-2xl" 
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setImageUrl('')}
-                  className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-black/80 rounded-full text-white transition-all shadow-md"
-                  aria-label="Remove image"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 bg-card hover:bg-muted/50 transition-colors relative">
-                {imageLoading ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="animate-spin text-primary" size={32} />
-                    <span className="text-sm text-muted-foreground">Reading file...</span>
-                  </div>
-                ) : (
-                  <label htmlFor="image-upload" className="flex flex-col items-center gap-2 cursor-pointer w-full h-full text-center">
-                    <ImageIcon size={36} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                    <span className="text-sm font-medium">Click to upload recipe image</span>
-                    <span className="text-xs text-muted-foreground">Supports PNG, JPG, WEBP (Max 1.5MB)</span>
-                    <input 
-                      type="file" 
-                      id="image-upload" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handleImageFile} 
+            {/* Grid of uploaded images */}
+            {imageUrls.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-2">
+                {imageUrls.map((url, idx) => (
+                  <div key={idx} className="relative group aspect-video overflow-hidden rounded-2xl border border-border bg-muted flex items-center justify-center shadow-sm animate-in fade-in duration-200">
+                    <img 
+                      src={url} 
+                      alt={`Recipe preview ${idx + 1}`} 
+                      className="w-full h-full object-cover" 
                     />
-                  </label>
-                )}
+                    <button 
+                      type="button" 
+                      onClick={() => setImageUrls(prev => prev.filter((_, i) => i !== idx))}
+                      className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/85 rounded-full text-white transition-all shadow-md"
+                      aria-label="Remove image"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
+            {/* Upload Area */}
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 bg-card hover:bg-muted/50 transition-colors relative">
+              {imageLoading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="animate-spin text-primary" size={32} />
+                  <span className="text-sm text-muted-foreground">Reading files...</span>
+                </div>
+              ) : (
+                <label htmlFor="image-upload" className="flex flex-col items-center gap-2 cursor-pointer w-full h-full text-center">
+                  <ImageIcon size={36} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                  <span className="text-sm font-medium">Click to upload recipe images (multiple allowed)</span>
+                  <span className="text-xs text-muted-foreground">Supports PNG, JPG, WEBP (Max 1.5MB per image)</span>
+                  <input 
+                    type="file" 
+                    id="image-upload" 
+                    accept="image/*" 
+                    multiple
+                    className="hidden" 
+                    onChange={handleImageFiles} 
+                  />
+                </label>
+              )}
+            </div>
+
             {/* Alternately paste image URL */}
-            {!imageUrl && !imageLoading && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">or</span>
-                <input 
-                  type="text" 
-                  placeholder="Paste direct image link (URL)" 
-                  value={imageUrl} 
-                  onChange={(e) => setImageUrl(e.target.value)} 
-                  className="flex-1 bg-transparent text-xs border-b border-border py-1 outline-none focus:border-primary transition"
-                />
-              </div>
-            )}
+            <div className="flex items-center gap-2 mt-2">
+              <input 
+                type="text" 
+                placeholder="Or paste direct image link (URL)" 
+                value={inputUrl} 
+                onChange={(e) => setInputUrl(e.target.value)} 
+                className="flex-1 bg-transparent text-xs border-b border-border py-1 outline-none focus:border-primary transition"
+              />
+              <button 
+                type="button" 
+                onClick={addPastedUrl}
+                className="px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-xl text-xs font-semibold text-foreground transition-all"
+              >
+                Add URL
+              </button>
+            </div>
           </div>
         </div>
 
