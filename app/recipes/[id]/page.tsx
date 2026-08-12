@@ -137,6 +137,11 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
             description={recipe.description} 
             ingredients={ingredients} 
             instructions={instructions} 
+            prep={recipe.preparation_time}
+            cook={recipe.cooking_time}
+            servings={recipe.servings}
+            difficulty={recipe.difficulty}
+            imageUrl={recipe.image_url}
           />
         </div>
 
