@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Clock3, Heart, Plus, Search, SlidersHorizontal, Settings2, Loader2, Sparkles } from 'lucide-react'
+import { Clock3, Heart, Plus, Search, SlidersHorizontal, Settings2, Loader2, Sparkles, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { 
   cacheFavoriteRecipes, 
@@ -204,7 +204,11 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
             }`}
             aria-label="Toggle search panel"
           >
-            <Search size={20} className="stroke-[2.2]" />
+            {isSearchVisible ? (
+              <X size={20} className="stroke-[2.2] animate-in spin-in-90 duration-200" />
+            ) : (
+              <Search size={20} className="stroke-[2.2] animate-in fade-in duration-200" />
+            )}
           </button>
 
           <div className="hidden md:flex items-center gap-2">
