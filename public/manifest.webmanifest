@@ -1,10 +1,15 @@
 {
-  "name": "crumb.",
+  "name": "crumb. — Good food, remembered.",
   "short_name": "crumb.",
-  "description": "Good food, remembered.",
+  "description": "A private, calm place for the recipes you love.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#f7f5ef",
   "theme_color": "#8b5e34",
-  "icons": []
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
 }
