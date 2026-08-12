@@ -1,0 +1,10 @@
+{
+  "name": "crumb.",
+  "short_name": "crumb.",
+  "description": "Good food, remembered.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5ef",
+  "theme_color": "#8b5e34",
+  "icons": []
+}
