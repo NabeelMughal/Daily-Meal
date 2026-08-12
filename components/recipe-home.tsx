@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Clock3, Heart, Plus, Search, SlidersHorizontal, Settings2, Loader2, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -57,6 +58,17 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
       window.removeEventListener('offline', update) 
     } 
   }, [])
+
+  const searchParams = useSearchParams()
+
+  // Sync favorites & categories from query parameters (bottom nav tab bar support)
+  useEffect(() => {
+    if (!searchParams) return
+    const filter = searchParams.get('filter')
+    const manage = searchParams.get('manage')
+    setOnlyFavorites(filter === 'favorites')
+    setIsCategoryManagerOpen(manage === 'categories')
+  }, [searchParams])
 
   // Load favorites
   useEffect(() => { 
@@ -184,7 +196,7 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
           <button onClick={() => setOnlyFavorites(true)} className="hover:text-foreground transition-colors">Your collection</button>
         </nav>
         
-        <div className="flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-2">
           <Link 
             href="/recipes/new" 
             className="flex items-center gap-2 rounded-full bg-primary hover:bg-primary/95 hover:shadow-md hover:scale-[1.02] active:scale-98 transition-all px-4 py-2.5 text-sm font-medium text-primary-foreground"
