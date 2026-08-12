@@ -8,6 +8,9 @@ import { BookOpen, Heart, Plus, Tag, User } from 'lucide-react'
 function MobileNavContent() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
+  // Hide bottom menu on auth layouts (login, sign-up, email callback)
+  if (pathname?.startsWith('/auth')) return null
   
   const filter = searchParams?.get('filter')
   const manage = searchParams?.get('manage')
