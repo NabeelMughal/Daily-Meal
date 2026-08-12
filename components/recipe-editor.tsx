@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Image as ImageIcon, Loader2, X, ArrowLeft } from 'lucide-react'
 import { listCachedCategories } from '@/lib/offline-db'
+import { FullScreenLoading } from './full-screen-loading'
 
 type Ingredient = { name: string; quantity: string; unit: string; notes: string }
 
@@ -52,6 +53,9 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categoryLoading, setCategoryLoading] = useState(false)
   const [imageLoading, setImageLoading] = useState(false)
+  
+  // ... rest of content
+
 
   // Fetch user categories
   useEffect(() => {
@@ -238,6 +242,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 transition-all duration-300">
+      <FullScreenLoading show={busy} message="Saving recipe to cookbook..." />
       
       {/* Recipe Meta Section */}
       <div className="grid gap-5 md:grid-cols-2">

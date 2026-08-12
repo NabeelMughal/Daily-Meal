@@ -6,6 +6,7 @@ import { pdf, Document, Page, Text, StyleSheet } from '@react-pdf/renderer'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { FullScreenLoading } from './full-screen-loading'
 
 type Props = { 
   recipeId: string
@@ -124,6 +125,8 @@ export function RecipeActions({ recipeId, title, description, ingredients, instr
 
   return (
     <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 max-w-full print:hidden">
+      <FullScreenLoading show={deleteBusy} message="Deleting recipe..." />
+      <FullScreenLoading show={downloadBusy} message="Preparing PDF download..." />
       
       {/* Edit Recipe Button */}
       <Link 
