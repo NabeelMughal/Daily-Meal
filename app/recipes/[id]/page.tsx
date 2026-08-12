@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, ChefHat, Users } from 'lucide-react'
 import { RecipeActions } from '@/components/recipe-actions'
 import { createClient } from '@/lib/supabase/server'
 import { InteractiveIngredients } from '@/components/interactive-ingredients'
+import { ImageSlideshow } from '@/components/image-slideshow'
 
 export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -57,6 +58,20 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const categoryName = recipe.categories 
     ? (Array.isArray(recipe.categories) ? recipe.categories[0]?.name : recipe.categories.name) 
     : null
+
+  // Parse multiple images JSON array (backward-compatible)
+  let images: string[] = []
+  if (recipe.image_url) {
+    if (recipe.image_url.startsWith('[')) {
+      try {
+        images = JSON.parse(recipe.image_url)
+      } catch (e) {
+        images = [recipe.image_url]
+      }
+    } else {
+      images = [recipe.image_url]
+    }
+  }
 
   return (
     <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -125,16 +140,8 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
           />
         </div>
 
-        {/* Hero Image Section */}
-        {recipe.image_url && (
-          <div className="mt-10 w-full overflow-hidden rounded-3xl border border-border/50 shadow-sm aspect-video sm:aspect-[21/9] max-h-[420px] bg-muted/30 relative">
-            <img 
-              src={recipe.image_url} 
-              alt={`Finished dish: ${recipe.title}`} 
-              className="w-full h-full object-cover transition-transform duration-700 hover:scale-[1.01]" 
-            />
-          </div>
-        )}
+        {/* Hero Image Slideshow Section */}
+        <ImageSlideshow images={images} />
 
         {/* Split Grid for Ingredients and Method */}
         <div className="mt-12 grid gap-12 lg:grid-cols-[0.9fr_1.1fr] border-t border-border/20 pt-10">
