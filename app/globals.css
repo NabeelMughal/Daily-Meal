@@ -37,3 +37,11 @@
 }
 
 .eyebrow { @apply font-mono text-xs uppercase tracking-[0.22em] text-primary; }
+
+@media print {
+  header, button, a[href='/'] { display: none !important; }
+  main, article { min-height: auto !important; }
+  body { background: white !important; color: black !important; }
+  h1 { font-size: 32pt !important; }
+  section { break-inside: avoid; }
+}

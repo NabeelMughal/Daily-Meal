@@ -7,5 +7,5 @@ export default async function AccountPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/?auth=login')
   const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).maybeSingle()
-  return <AccountForm email={user.email ?? ''} initialName={profile?.full_name ?? ''} />
+  return <AccountForm email={user.email ?? ''} initialName={profile?.full_name ?? ''} userId={user.id} />
 }

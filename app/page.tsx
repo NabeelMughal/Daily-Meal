@@ -8,5 +8,5 @@ export default async function Page() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const recipes = await listRecipes()
-  return <RecipeHome recipes={recipes} email={user.email ?? 'Your kitchen'} />
+  return <RecipeHome recipes={recipes} email={user.email ?? 'Your kitchen'} userId={user.id} />
 }
