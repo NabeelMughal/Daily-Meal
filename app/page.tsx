@@ -8,7 +8,7 @@ export default async function Page() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
-  const recipes = await listRecipes()
+  const recipes = await listRecipes(user.id)
   
   return (
     <Suspense fallback={
