@@ -13,19 +13,31 @@ export type RecipeInput = {
   image_url?: string | null
 }
 
-export async function listRecipes() {
+export async function listRecipes(userId?: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-  const { data } = await supabase.from('recipes').select('*, ingredients(*), instructions(*)').eq('user_id', user.id).order('created_at', { ascending: false })
+  let finalUserId = userId
+  if (!finalUserId) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+    finalUserId = user.id
+  }
+  const { data } = await supabase
+    .from('recipes')
+    .select('id, title, description, difficulty, preparation_time, cooking_time, servings, category_id, image_url, created_at')
+    .eq('user_id', finalUserId)
+    .order('created_at', { ascending: false })
   return data ?? []
 }
 
-export async function getRecipe(id: string) {
+export async function getRecipe(id: string, userId?: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const { data } = await supabase.from('recipes').select('*, ingredients(*), instructions(*)').eq('id', id).eq('user_id', user.id).maybeSingle()
+  let finalUserId = userId
+  if (!finalUserId) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    finalUserId = user.id
+  }
+  const { data } = await supabase.from('recipes').select('*, ingredients(*), instructions(*)').eq('id', id).eq('user_id', finalUserId).maybeSingle()
   return data
 }
 
@@ -59,9 +71,21 @@ export async function createRecipe(input: RecipeInput) {
   const instructions = input.instructions
     .filter(Boolean)
     .map((instruction, position) => ({ recipe_id: recipe.id, instruction: instruction.trim(), position }))
-    
-  if (ingredients.length) await supabase.from('ingredients').insert(ingredients)
-  if (instructions.length) await supabase.from('instructions').insert(instructions)
+  
+  const insertPromises = []
+  if (ingredients.length) {
+    insertPromises.push(supabase.from('ingredients').insert(ingredients))
+  }
+  if (instructions.length) {
+    insertPromises.push(supabase.from('instructions').insert(instructions))
+  }
+  
+  if (insertPromises.length) {
+    const results = await Promise.all(insertPromises)
+    for (const res of results) {
+      if (res.error) throw new Error(res.error.message)
+    }
+  }
   
   return recipe
 }
@@ -71,36 +95,52 @@ export async function updateRecipe(id: string, input: RecipeInput) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Authentication required')
   
-  const { error: recipeError } = await supabase
-    .from('recipes')
-    .update({
-      title: input.title.trim(),
-      description: input.description.trim(),
-      preparation_time: input.preparation_time,
-      cooking_time: input.cooking_time,
-      servings: input.servings,
-      difficulty: input.difficulty,
-      category_id: input.category_id || null,
-      image_url: input.image_url || null
-    })
-    .eq('id', id)
-    .eq('user_id', user.id)
+  // Parallelize updating the recipe, and deleting old ingredients and instructions
+  const [recipeResult, deleteIngredientsResult, deleteInstructionsResult] = await Promise.all([
+    supabase
+      .from('recipes')
+      .update({
+        title: input.title.trim(),
+        description: input.description.trim(),
+        preparation_time: input.preparation_time,
+        cooking_time: input.cooking_time,
+        servings: input.servings,
+        difficulty: input.difficulty,
+        category_id: input.category_id || null,
+        image_url: input.image_url || null
+      })
+      .eq('id', id)
+      .eq('user_id', user.id),
+    supabase.from('ingredients').delete().eq('recipe_id', id),
+    supabase.from('instructions').delete().eq('recipe_id', id)
+  ])
     
-  if (recipeError) throw new Error(recipeError.message)
+  if (recipeResult.error) throw new Error(recipeResult.error.message)
+  if (deleteIngredientsResult.error) throw new Error(deleteIngredientsResult.error.message)
+  if (deleteInstructionsResult.error) throw new Error(deleteInstructionsResult.error.message)
   
-  // Re-insert ingredients
-  await supabase.from('ingredients').delete().eq('recipe_id', id)
   const ingredients = input.ingredients
     .filter((item) => item.name.trim())
     .map((item, position) => ({ ...item, recipe_id: id, name: item.name.trim(), position }))
-  if (ingredients.length) await supabase.from('ingredients').insert(ingredients)
   
-  // Re-insert instructions
-  await supabase.from('instructions').delete().eq('recipe_id', id)
   const instructions = input.instructions
     .filter(Boolean)
     .map((instruction, position) => ({ recipe_id: id, instruction: instruction.trim(), position }))
-  if (instructions.length) await supabase.from('instructions').insert(instructions)
+
+  const insertPromises = []
+  if (ingredients.length) {
+    insertPromises.push(supabase.from('ingredients').insert(ingredients))
+  }
+  if (instructions.length) {
+    insertPromises.push(supabase.from('instructions').insert(instructions))
+  }
+
+  if (insertPromises.length) {
+    const results = await Promise.all(insertPromises)
+    for (const res of results) {
+      if (res.error) throw new Error(res.error.message)
+    }
+  }
 }
 
 export async function deleteRecipe(id: string) {
