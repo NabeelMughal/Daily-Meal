@@ -27,6 +27,7 @@ export function ImageSlideshow({ images }: { images: string[] }) {
         <img
           src={images[currentIndex]}
           alt={`Recipe slide ${currentIndex + 1}`}
+          loading="lazy"
           className="w-full h-full object-cover cursor-zoom-in transition-transform duration-500 hover:scale-[1.01]"
           onClick={() => setIsPreviewOpen(true)}
         />
