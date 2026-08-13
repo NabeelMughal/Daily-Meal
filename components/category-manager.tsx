@@ -13,12 +13,13 @@ type Category = {
 }
 
 type Props = {
+  userId: string
   isOpen: boolean
   onClose: () => void
   onChanged: () => void
 }
 
-export function CategoryManager({ isOpen, onClose, onChanged }: Props) {
+export function CategoryManager({ userId, isOpen, onClose, onChanged }: Props) {
   const [categories, setCategories] = useState<Category[]>([])
   const [newCategoryName, setNewCategoryName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -40,14 +41,9 @@ export function CategoryManager({ isOpen, onClose, onChanged }: Props) {
     setLoading(true)
     setErrorMsg('')
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setLoading(false)
-      return
-    }
 
     if (!navigator.onLine) {
-      const cached = await listCachedCategories(user.id)
+      const cached = await listCachedCategories(userId)
       setCategories(cached.map(c => ({ id: c.id, name: c.name, user_id: c.userId, created_at: new Date(c.createdAt).toISOString() })))
       setLoading(false)
       return
@@ -57,7 +53,7 @@ export function CategoryManager({ isOpen, onClose, onChanged }: Props) {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('name', { ascending: true })
 
       if (error) throw new Error(error.message)
@@ -77,21 +73,19 @@ export function CategoryManager({ isOpen, onClose, onChanged }: Props) {
     setErrorMsg('')
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Authentication required')
 
       const { data, error } = await supabase
         .from('categories')
-        .insert({ user_id: user.id, name: newCategoryName.trim() })
+        .insert({ user_id: userId, name: newCategoryName.trim() })
         .select()
         .single()
 
       if (error || !data) throw new Error(error?.message ?? 'Failed to create category')
 
       // Cache offline
-      await setCachedCategory(user.id, {
+      await setCachedCategory(userId, {
         id: data.id,
-        userId: user.id,
+        userId: userId,
         name: data.name,
         createdAt: new Date(data.created_at).getTime()
       })
@@ -112,23 +106,21 @@ export function CategoryManager({ isOpen, onClose, onChanged }: Props) {
     setErrorMsg('')
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Authentication required')
 
       const { data, error } = await supabase
         .from('categories')
         .update({ name: editingName.trim() })
         .eq('id', id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .select()
         .single()
 
       if (error || !data) throw new Error(error?.message ?? 'Failed to update category')
 
       // Cache offline
-      await setCachedCategory(user.id, {
+      await setCachedCategory(userId, {
         id: data.id,
-        userId: user.id,
+        userId: userId,
         name: data.name,
         createdAt: new Date(data.created_at).getTime()
       })
@@ -149,19 +141,17 @@ export function CategoryManager({ isOpen, onClose, onChanged }: Props) {
     setErrorMsg('')
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Authentication required')
 
       const { error } = await supabase
         .from('categories')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
 
       if (error) throw new Error(error.message)
 
       // Delete offline
-      await deleteCachedCategory(user.id, id)
+      await deleteCachedCategory(userId, id)
 
       setCategories((prev) => prev.filter(c => c.id !== id))
       onChanged()
