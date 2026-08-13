@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Copy, Download, Printer, Share2, Edit, Trash2, Check, Loader2, BookOpen, X } from 'lucide-react'
 import { pdf, Document, Page, Text, Image, View, StyleSheet } from '@react-pdf/renderer'
 import { useRouter } from 'next/navigation'
@@ -9,7 +9,6 @@ import Link from 'next/link'
 import { FullScreenLoading } from './full-screen-loading'
 
 type Props = { 
-  userId?: string
   recipeId: string
   title: string 
   description?: string | null 
@@ -99,7 +98,6 @@ function RecipeDocument({ title, description, ingredients, instructions, prep = 
 }
 
 export function RecipeActions({ 
-  userId,
   recipeId, 
   title, 
   description, 
@@ -116,18 +114,6 @@ export function RecipeActions({
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-
-  // Track recently viewed client-side on mount to avoid Next.js SSR header/cookie write exceptions
-  useEffect(() => {
-    if (!recipeId || !userId) return
-    const supabase = createClient()
-    supabase.from('recently_viewed').upsert(
-      { user_id: userId, recipe_id: recipeId, viewed_at: new Date().toISOString() }, 
-      { onConflict: 'user_id,recipe_id' }
-    ).catch((err) => {
-      console.error('Failed to log recently viewed history:', err)
-    })
-  }, [recipeId, userId])
 
   // Share action
   async function share() { 
