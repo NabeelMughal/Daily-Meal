@@ -1,33 +1,69 @@
 # Daily-Meal
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+Daily-Meal is a mobile-first recipe PWA for saving, organizing, searching, and managing personal recipes.
 
-## Built with v0
+# Features
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+- Login, signup, forgot password
+- Recipe add, edit, delete
+- Multiple recipe images with preview, update, delete, and reorder
+- Ingredients, quantities, and cooking instructions
+- Categories and tags
+- Search, filters, and sorting
+- Favorites and recently viewed recipes
+- Recipe sharing
+- PDF generation and printing
+- Offline access to saved recipes
+- Light and dark mode
+- Responsive mobile-first interface
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_FSkbK6IJN91szBDiDc3cPxHd2J1o)
+# Tech Stack
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Supabase Auth
+- Supabase PostgreSQL
+- Supabase Storage
+- IndexedDB
+- PWA
 
 ## Getting Started
 
-First, run the development server:
+First, clone the repository:
+
+```bash
+git clone https://github.com/NabeelMughal/Daily-Meal.git
+cd Daily-Meal
+```
+
+Install the dependencies:
+
+```bash
+npm install
+```
+
+Create a `.env.local` file and add your Supabase configuration:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Links
 
-## Learn More
-
-To learn more, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+- [GitHub Repository](https://github.com/NabeelMughal/Daily-Meal)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Supabase Documentation](https://supabase.com/docs)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [shadcn/ui Documentation](https://ui.shadcn.com/)
