@@ -41,14 +41,6 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
 
   if (!recipe) notFound()
 
-  // Track recently viewed in background to avoid blocking rendering
-  supabase.from('recently_viewed').upsert(
-    { user_id: user.id, recipe_id: id, viewed_at: new Date().toISOString() }, 
-    { onConflict: 'user_id,recipe_id' }
-  ).catch((err) => {
-    console.error('Failed to log recently viewed history:', err)
-  })
-
   const ingredients = [...(recipe.ingredients ?? [])].sort((a, b) => a.position - b.position)
   const instructions = [...(recipe.instructions ?? [])].sort((a, b) => a.position - b.position)
   
@@ -130,6 +122,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
         {/* Unified actions toolbar (Edit, Delete, PDF, print, etc.) */}
         <div className="mt-8 border-y border-border/60 py-4 max-w-full">
           <RecipeActions 
+            userId={user.id}
             recipeId={recipe.id}
             title={recipe.title} 
             description={recipe.description} 
