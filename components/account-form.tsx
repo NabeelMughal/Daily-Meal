@@ -23,7 +23,8 @@ export function AccountForm({ email, initialName, userId }: { email: string; ini
   async function save() {
     setBusy(true)
     const supabase = createClient()
-    await supabase.from('profiles').upsert({ id: userId, full_name: name.trim() || null })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) await supabase.from('profiles').upsert({ id: user.id, full_name: name.trim() || null })
     setBusy(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 1800)

@@ -45,7 +45,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
         </p>
 
         <div className="mt-10">
-          <RecipeEditor recipe={recipe} userId={user.id} />
+          <RecipeEditor recipe={recipe} />
         </div>
       </section>
     </main>
