@@ -71,20 +71,51 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
     setIsCategoryManagerOpen(manage === 'categories')
   }, [searchParams])
 
-  // Load favorites
+  // Load favorites and sync with server once on mount
   useEffect(() => { 
-    listCachedFavorites(userId).then((items) => { 
+    listCachedFavorites(userId).then(async (items) => { 
       setFavoriteRecipes(items)
       setFavorites(items.map((item) => item.id)) 
+
+      if (navigator.onLine) {
+        try {
+          const supabase = createClient()
+          const { data: serverFavs, error } = await supabase.from('favorites').select('recipe_id').eq('user_id', userId)
+          if (serverFavs && !error) {
+            const serverIds = serverFavs.map(f => f.recipe_id)
+            const localIds = items.map(item => item.id)
+            const missingIds = serverIds.filter(id => !localIds.includes(id))
+            
+            let updatedFavorites = [...items]
+            
+            if (missingIds.length > 0) {
+              const { data: missingRecipes } = await supabase
+                .from('recipes')
+                .select('*, ingredients(*), instructions(*)')
+                .in('id', missingIds)
+                
+              if (missingRecipes && missingRecipes.length > 0) {
+                const cachedRecipes = missingRecipes.map(r => toCachedRecipe(userId, r))
+                await cacheFavoriteRecipes(userId, cachedRecipes)
+                updatedFavorites = [...updatedFavorites, ...cachedRecipes]
+              }
+            }
+            
+            const removedIds = localIds.filter(id => !serverIds.includes(id))
+            if (removedIds.length > 0) {
+              await Promise.all(removedIds.map(id => setCachedFavorite(userId, id, false)))
+              updatedFavorites = updatedFavorites.filter(item => !removedIds.includes(item.id))
+            }
+            
+            setFavoriteRecipes(updatedFavorites)
+            setFavorites(updatedFavorites.map(item => item.id))
+          }
+        } catch (err) {
+          console.error('Failed to sync favorites with server:', err)
+        }
+      }
     }) 
   }, [userId])
-
-  // Sync favorites online -> offline DB
-  useEffect(() => { 
-    if (navigator.onLine && recipes.length) {
-      cacheFavoriteRecipes(userId, favoriteRecipes.filter((item) => favorites.includes(item.id))).catch(() => {}) 
-    }
-  }, [favoriteRecipes, favorites, recipes.length, userId])
 
   // Load categories (offline vs online)
   async function loadCategories() {
@@ -150,34 +181,45 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
       setFavoriteRecipes((current) => [...current.filter((item) => item.id !== recipe.id), cached])
       await cacheFavoriteRecipes(userId, [cached]).catch(() => {})
     } else {
+      setFavoriteRecipes((current) => current.filter((item) => item.id !== recipe.id))
       await setCachedFavorite(userId, recipe.id, false).catch(() => {})
     }
 
     if (!navigator.onLine) return 
 
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
     try {
-      const result = saved 
-        ? await supabase.from('favorites').delete().eq('recipe_id', recipe.id).eq('user_id', user.id) 
-        : await supabase.from('favorites').insert({ user_id: user.id, recipe_id: recipe.id })
-
-      if (result.error) { 
-        // Rollback state if server returns error
-        setFavorites((current) => saved ? [...current, recipe.id] : current.filter((id) => id !== recipe.id))
-        if (!saved) { 
-          setFavoriteRecipes((current) => current.filter((item) => item.id !== recipe.id))
-          await setCachedFavorite(userId, recipe.id, false).catch(() => {})
-        } else {
-          const cached = toCachedRecipe(userId, recipe)
+      if (saved) {
+        const result = await supabase.from('favorites').delete().eq('recipe_id', recipe.id).eq('user_id', userId)
+        if (result.error) throw result.error
+      } else {
+        // Fetch full recipe details in background to cache complete recipe offline (with ingredients & instructions)
+        const [favResult, detailsResult] = await Promise.all([
+          supabase.from('favorites').insert({ user_id: userId, recipe_id: recipe.id }),
+          supabase.from('recipes').select('*, ingredients(*), instructions(*)').eq('id', recipe.id).single()
+        ])
+        
+        if (favResult.error) throw favResult.error
+        if (detailsResult.error) throw detailsResult.error
+        
+        if (detailsResult.data) {
+          const cached = toCachedRecipe(userId, detailsResult.data)
           setFavoriteRecipes((current) => [...current.filter((item) => item.id !== recipe.id), cached])
           await cacheFavoriteRecipes(userId, [cached]).catch(() => {})
         }
-      } 
+      }
     } catch (err) {
-      console.error(err)
+      console.error('Failed to toggle favorite on server:', err)
+      // Rollback state if server returns error
+      setFavorites((current) => saved ? [...current, recipe.id] : current.filter((id) => id !== recipe.id))
+      if (!saved) { 
+        setFavoriteRecipes((current) => current.filter((item) => item.id !== recipe.id))
+        await setCachedFavorite(userId, recipe.id, false).catch(() => {})
+      } else {
+        const cached = toCachedRecipe(userId, recipe)
+        setFavoriteRecipes((current) => [...current.filter((item) => item.id !== recipe.id), cached])
+        await cacheFavoriteRecipes(userId, [cached]).catch(() => {})
+      }
     }
   }
 
@@ -445,6 +487,7 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
                         <img 
                           src={displayImageUrl} 
                           alt={recipe.title} 
+                          loading="lazy"
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                         />
                       </div>
@@ -513,6 +556,7 @@ export function RecipeHome({ recipes, email, userId }: { recipes: Recipe[]; emai
 
       {/* Category Manager Modal */}
       <CategoryManager 
+        userId={userId}
         isOpen={isCategoryManagerOpen} 
         onClose={() => setIsCategoryManagerOpen(false)} 
         onChanged={loadCategories} 

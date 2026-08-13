@@ -66,7 +66,7 @@ type Recipe = {
   instructions?: Array<{ instruction: string }>
 }
 
-export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
+export function RecipeEditor({ recipe, userId }: { recipe?: Recipe; userId: string }) {
   const router = useRouter()
   const [title, setTitle] = useState(recipe?.title ?? '')
   const [description, setDescription] = useState(recipe?.description ?? '')
@@ -130,17 +130,15 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
 
       if (!navigator.onLine) {
-        const cached = await listCachedCategories(user.id)
+        const cached = await listCachedCategories(userId)
         setCategories(cached)
         return
       }
 
       try {
-        const { data, error } = await supabase.from('categories').select('*').eq('user_id', user.id).order('name', { ascending: true })
+        const { data, error } = await supabase.from('categories').select('*').eq('user_id', userId).order('name', { ascending: true })
         if (data && !error) {
           setCategories(data)
         }
@@ -149,7 +147,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
       }
     }
     load()
-  }, [])
+  }, [userId])
 
   function updateIngredient(index: number, key: keyof Ingredient, value: string) {
     setIngredients((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item))
@@ -163,16 +161,10 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
     setMessage('')
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setMessage('Auth required.')
-        setCategoryLoading(false)
-        return
-      }
 
       const { data, error } = await supabase
         .from('categories')
-        .insert({ user_id: user.id, name: newCategoryName.trim() })
+        .insert({ user_id: userId, name: newCategoryName.trim() })
         .select()
         .single()
 
@@ -228,14 +220,9 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
     setMessage('')
     
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { 
-      router.push('/?auth=login')
-      return 
-    }
 
     const payload = {
-      user_id: user.id,
+      user_id: userId,
       title: title.trim(),
       description: description.trim(),
       preparation_time: Number(prep) || 0,
@@ -251,17 +238,16 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
 
       if (recipe) {
         // UPDATE MODE
-        const { error } = await supabase
-          .from('recipes')
-          .update(payload)
-          .eq('id', recipe.id)
-          .eq('user_id', user.id)
+        // Parallelize updating the recipe, and deleting old ingredients and instructions
+        const [updateRes, deleteIngRes, deleteInstRes] = await Promise.all([
+          supabase.from('recipes').update(payload).eq('id', recipe.id).eq('user_id', userId),
+          supabase.from('ingredients').delete().eq('recipe_id', recipe.id),
+          supabase.from('instructions').delete().eq('recipe_id', recipe.id)
+        ])
 
-        if (error) throw new Error(error.message)
-        
-        // Refresh ingredients and instructions
-        await supabase.from('ingredients').delete().eq('recipe_id', recipe.id)
-        await supabase.from('instructions').delete().eq('recipe_id', recipe.id)
+        if (updateRes.error) throw new Error(updateRes.error.message)
+        if (deleteIngRes.error) throw new Error(deleteIngRes.error.message)
+        if (deleteInstRes.error) throw new Error(deleteInstRes.error.message)
       } else {
         // CREATE MODE
         const { data: newRecipe, error } = await supabase
@@ -295,14 +281,20 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
           position 
         }))
 
+      // Insert ingredients and instructions in parallel
+      const insertPromises = []
       if (ingredientRows.length) {
-        const { error: ingError } = await supabase.from('ingredients').insert(ingredientRows)
-        if (ingError) throw ingError
+        insertPromises.push(supabase.from('ingredients').insert(ingredientRows))
       }
-      
       if (instructionRows.length) {
-        const { error: instError } = await supabase.from('instructions').insert(instructionRows)
-        if (instError) throw instError
+        insertPromises.push(supabase.from('instructions').insert(instructionRows))
+      }
+
+      if (insertPromises.length) {
+        const results = await Promise.all(insertPromises)
+        for (const res of results) {
+          if (res.error) throw res.error
+        }
       }
 
       router.push(`/recipes/${targetId}`)
