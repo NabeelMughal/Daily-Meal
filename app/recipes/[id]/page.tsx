@@ -41,15 +41,13 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
 
   if (!recipe) notFound()
 
-  // Track recently viewed in a try-catch block to avoid crashing on schema mismatch
-  try {
-    await supabase.from('recently_viewed').upsert(
-      { user_id: user.id, recipe_id: id, viewed_at: new Date().toISOString() }, 
-      { onConflict: 'user_id,recipe_id' }
-    )
-  } catch (err) {
+  // Track recently viewed in background to avoid blocking rendering
+  supabase.from('recently_viewed').upsert(
+    { user_id: user.id, recipe_id: id, viewed_at: new Date().toISOString() }, 
+    { onConflict: 'user_id,recipe_id' }
+  ).catch((err) => {
     console.error('Failed to log recently viewed history:', err)
-  }
+  })
 
   const ingredients = [...(recipe.ingredients ?? [])].sort((a, b) => a.position - b.position)
   const instructions = [...(recipe.instructions ?? [])].sort((a, b) => a.position - b.position)
