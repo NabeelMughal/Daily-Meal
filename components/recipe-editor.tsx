@@ -91,9 +91,20 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
   
   const [inputUrl, setInputUrl] = useState('')
   
-  // Ingredients state setup (initialize with default structure)
+  // Ingredients state setup (initialize with default structure, combining quantity, unit, and notes for edit mode)
   const initialIngredients = recipe?.ingredients && recipe.ingredients.length > 0 
-    ? recipe.ingredients.map(item => ({ name: item.name, quantity: item.quantity, unit: item.unit, notes: item.notes ?? '' }))
+    ? recipe.ingredients.map(item => {
+        const parts = []
+        if (item.quantity?.trim()) parts.push(item.quantity.trim())
+        if (item.unit?.trim()) parts.push(item.unit.trim())
+        if (item.notes?.trim()) parts.push(item.notes.trim())
+        return {
+          name: item.name,
+          quantity: parts.join(' '),
+          unit: '',
+          notes: ''
+        }
+      })
     : [{ name: '', quantity: '', unit: '', notes: '' }]
   const [ingredients, setIngredients] = useState<Ingredient[]>(initialIngredients)
   
@@ -524,22 +535,15 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
 
       {/* Ingredients Section */}
       <section className="transition-all duration-300">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4">
           <h2 className="font-serif text-2xl">Ingredients</h2>
-          <button 
-            type="button" 
-            onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '', notes: '' }])} 
-            className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline transition-all"
-          >
-            <Plus size={16} /> Add ingredient
-          </button>
         </div>
         
         <div className="flex flex-col gap-3">
           {ingredients.map((item, index) => (
             <div 
               key={index} 
-              className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-[1.5fr_0.8fr_0.8fr_1fr_auto] items-center transition-all animate-in fade-in duration-200"
+              className="grid gap-3 rounded-2xl border border-border bg-card p-4 grid-cols-1 sm:grid-cols-[1fr_1fr_auto] items-center transition-all animate-in fade-in duration-200"
             >
               <input 
                 required={index === 0} 
@@ -551,19 +555,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
               <input 
                 value={item.quantity} 
                 onChange={(event) => updateIngredient(index, 'quantity', event.target.value)} 
-                placeholder="Qty" 
-                className="field-input" 
-              />
-              <input 
-                value={item.unit} 
-                onChange={(event) => updateIngredient(index, 'unit', event.target.value)} 
-                placeholder="Unit (e.g. g, tbsp)" 
-                className="field-input" 
-              />
-              <input 
-                value={item.notes} 
-                onChange={(event) => updateIngredient(index, 'notes', event.target.value)} 
-                placeholder="Notes (e.g. chopped)" 
+                placeholder="Qty, unit or notes (e.g. 200g chopped)" 
                 className="field-input" 
               />
               {ingredients.length > 1 && (
@@ -578,6 +570,15 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
               )}
             </div>
           ))}
+
+          {/* Add ingredient button at the bottom, full width with a brown background */}
+          <button 
+            type="button" 
+            onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '', notes: '' }])} 
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground py-3.5 px-4 font-semibold text-sm transition-all duration-200 shadow-sm active:scale-[0.99] mt-1"
+          >
+            <Plus size={16} /> Add ingredient
+          </button>
         </div>
       </section>
 
